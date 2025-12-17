@@ -19,6 +19,7 @@
 #define G_LOG_DOMAIN "GcalManager"
 
 #include "gcal-application.h"
+#include "gcal-config-loader.h"
 #include "gcal-context.h"
 #include "gcal-debug.h"
 #include "gcal-manager.h"
@@ -26,7 +27,8 @@
 #include "gcal-timeline-subscriber.h"
 #include "gcal-utils.h"
 
-#include <libedataserverui4/libedataserverui4.h>
+#include <libedataserver/libedataserver.h>
+#include <libecal/libecal.h>
 
 /**
  * SECTION:gcal-manager
@@ -67,7 +69,7 @@ struct _GcalManager
   GListStore         *calendars_model;
 
   ESourceRegistry    *source_registry;
-  ECredentialsPrompter *credentials_prompter;
+  /* ECredentialsPrompter removed - no longer needed without GOA */
 
   GCancellable       *async_ops;
 
@@ -439,65 +441,34 @@ on_event_removed (GObject      *source_object,
   GCAL_EXIT;
 }
 
+/* Removed - no longer needed without GOA
 static void
 show_source_error (const gchar  *where,
                    const gchar  *what,
                    ESource      *source,
                    const GError *error)
 {
-  if (!error || g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-    return;
-
-  /* TODO Show the error in UI, somehow */
-  g_warning ("%s: %s '%s': %s", where, what, e_source_get_display_name (source), error->message);
+  ...
 }
+*/
 
+/* Removed - no longer needed without GOA
 static void
 source_invoke_authenticate_cb (GObject      *source_object,
                                GAsyncResult *result,
                                gpointer      user_data)
 {
-  ESource *source = E_SOURCE (source_object);
-  GError *error = NULL;
-
-  GCAL_ENTRY;
-
-  if (!e_source_invoke_authenticate_finish (source, result, &error) &&
-      !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-    {
-      show_source_error (G_STRFUNC, "Failed to invoke authenticate", source, error);
-    }
-
-  g_clear_error (&error);
-
-  GCAL_EXIT;
+  ...
 }
+*/
 
+/* GOA-related callback functions removed - no longer needed without GOA
 static void
 source_trust_prompt_done_cb (GObject      *source_object,
                              GAsyncResult *result,
                              gpointer      user_data)
 {
-  ETrustPromptResponse response = E_TRUST_PROMPT_RESPONSE_UNKNOWN;
-  ESource *source = E_SOURCE (source_object);
-  GError *error = NULL;
-
-  GCAL_ENTRY;
-
-  if (!e_trust_prompt_run_for_source_finish (source, result, &response, &error))
-    {
-      show_source_error (G_STRFUNC, "Failed to prompt for trust for", source, error);
-    }
-  else if (response == E_TRUST_PROMPT_RESPONSE_ACCEPT ||
-           response == E_TRUST_PROMPT_RESPONSE_ACCEPT_TEMPORARILY)
-    {
-      /* Use NULL credentials to reuse those from the last time. */
-      e_source_invoke_authenticate (source, NULL, NULL /* cancellable */, source_invoke_authenticate_cb, NULL);
-    }
-
-  g_clear_error (&error);
-
-  GCAL_EXIT;
+  ...
 }
 
 static void
@@ -509,35 +480,7 @@ source_credentials_required_cb (ESourceRegistry         *registry,
                                 const GError            *op_error,
                                 GcalManager             *self)
 {
-  ECredentialsPrompter *credentials_prompter;
-
-  GCAL_ENTRY;
-
-  g_return_if_fail (GCAL_IS_MANAGER (self));
-
-  credentials_prompter = self->credentials_prompter;
-
-  if (e_credentials_prompter_get_auto_prompt_disabled_for (credentials_prompter, source))
-    return;
-
-  if (reason == E_SOURCE_CREDENTIALS_REASON_SSL_FAILED)
-    {
-      e_trust_prompt_run_for_source (e_credentials_prompter_get_dialog_parent (credentials_prompter),
-                                     source,
-                                     certificate_pem,
-                                     certificate_errors,
-                                     op_error ? op_error->message : NULL,
-                                     TRUE /* allow_source_save */,
-                                     NULL /* cancellable */,
-                                     source_trust_prompt_done_cb,
-                                     NULL);
-    }
-  else if (reason == E_SOURCE_CREDENTIALS_REASON_ERROR && op_error)
-    {
-      show_source_error (G_STRFUNC, "Failed to authenticate", source, op_error);
-    }
-
-  GCAL_EXIT;
+  ...
 }
 
 static void
@@ -545,41 +488,9 @@ source_get_last_credentials_required_arguments_cb (GObject      *source_object,
                                                    GAsyncResult *result,
                                                    gpointer      user_data)
 {
-  GcalManager *self = user_data;
-  ESource *source;
-  ESourceCredentialsReason reason = E_SOURCE_CREDENTIALS_REASON_UNKNOWN;
-  gchar *certificate_pem = NULL;
-  GTlsCertificateFlags certificate_errors = 0;
-  GError *op_error = NULL;
-  GError *error = NULL;
-
-  GCAL_ENTRY;
-
-  g_return_if_fail (E_IS_SOURCE (source_object));
-
-  source = E_SOURCE (source_object);
-
-  if (!e_source_get_last_credentials_required_arguments_finish (source, result, &reason,
-          &certificate_pem, &certificate_errors, &op_error, &error))
-    {
-      /* Can be cancelled only if the manager is disposing/disposed */
-      if (error && !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-        show_source_error (G_STRFUNC, "Failed to get last credentials required arguments for", source, error);
-
-      g_clear_error (&error);
-      return;
-    }
-
-  g_return_if_fail (GCAL_IS_MANAGER (self));
-
-  if (reason != E_SOURCE_CREDENTIALS_REASON_UNKNOWN)
-    source_credentials_required_cb (NULL, source, reason, certificate_pem, certificate_errors, op_error, self);
-
-  g_free (certificate_pem);
-  g_clear_error (&op_error);
-
-  GCAL_EXIT;
+  ...
 }
+*/
 
 static void
 gcal_manager_finalize (GObject *object)
@@ -1242,8 +1153,6 @@ gcal_manager_get_synchronizing (GcalManager *self)
 void
 gcal_manager_startup (GcalManager *self)
 {
-  ESourceCredentialsProvider *credentials_provider;
-  GList *sources, *l;
   GError *error = NULL;
 
   GCAL_ENTRY;
@@ -1274,80 +1183,98 @@ gcal_manager_startup (GcalManager *self)
                                self,
                                NULL);
 
-  self->credentials_prompter = e_credentials_prompter_new (self->source_registry);
+  /* Load declarative CalDAV configuration (replaces GOA) */
+  {
+    g_autoptr (GcalAccountConfig) config = NULL;
+    g_autoptr (ESource) caldav_source = NULL;
+    g_autoptr (GError) config_error = NULL;
 
-  /* First disable credentials prompt for all but calendar sources... */
-  sources = e_source_registry_list_sources (self->source_registry, NULL);
+    g_debug ("Loading declarative CalDAV configuration...");
 
-  for (l = sources; l != NULL; l = g_list_next (l))
-    {
-      ESource *source = E_SOURCE (l->data);
+    config = gcal_config_loader_load_account (&config_error);
 
-      /* Mark for skip also currently disabled sources */
-      if (!e_source_has_extension (source, E_SOURCE_EXTENSION_CALENDAR) &&
-          !e_source_has_extension (source, E_SOURCE_EXTENSION_COLLECTION))
-        {
-          e_credentials_prompter_set_auto_prompt_disabled_for (self->credentials_prompter, source, TRUE);
-        }
-      else
-        {
-          e_source_get_last_credentials_required_arguments (source,
-                                                            NULL,
-                                                            source_get_last_credentials_required_arguments_cb,
-                                                            self);
-        }
-    }
+    if (config_error)
+      {
+        g_critical ("Failed to load CalDAV configuration: %s", config_error->message);
+        return;
+      }
 
-  g_list_free_full (sources, g_object_unref);
+    if (!config->enabled)
+      {
+        g_debug ("CalDAV account is disabled in configuration, exiting");
+        return;
+      }
 
-  credentials_provider = e_credentials_prompter_get_provider (self->credentials_prompter);
+    caldav_source = gcal_config_loader_create_caldav_source (config,
+                                                              self->source_registry,
+                                                              &config_error);
 
-  /* ...then enable credentials prompt for credential source of the calendar sources,
-     which can be a collection source.  */
-  sources = e_source_registry_list_sources (self->source_registry, E_SOURCE_EXTENSION_CALENDAR);
+    if (config_error)
+      {
+        g_critical ("Failed to create CalDAV source: %s", config_error->message);
+        return;
+      }
 
-  for (l = sources; l != NULL; l = g_list_next (l))
-    {
-      ESource *source, *cred_source;
+    /* Commit the source to registry */
+    e_source_registry_commit_source_sync (self->source_registry,
+                                          caldav_source,
+                                          NULL,
+                                          &config_error);
 
-      source = l->data;
-      cred_source = e_source_credentials_provider_ref_credentials_source (credentials_provider, source);
+    if (config_error)
+      {
+        g_critical ("Failed to commit CalDAV source to registry: %s", config_error->message);
+        return;
+      }
 
-      if (cred_source && !e_source_equal (source, cred_source))
-	{
-          e_credentials_prompter_set_auto_prompt_disabled_for (self->credentials_prompter, cred_source, FALSE);
+    /* Store credentials for the source before connecting */
+    if (config->password && *config->password)
+      {
+        g_autoptr (ESourceCredentialsProvider) provider = NULL;
+        g_autoptr (ENamedParameters) credentials = NULL;
+        ESourceAuthentication *auth;
+        const gchar *username;
 
-          /* Only consider SSL errors */
-          if (e_source_get_connection_status (cred_source) != E_SOURCE_CONNECTION_STATUS_SSL_FAILED)
-            continue;
+        auth = e_source_get_extension (caldav_source, E_SOURCE_EXTENSION_AUTHENTICATION);
+        username = e_source_authentication_get_user (auth);
 
-          e_source_get_last_credentials_required_arguments (cred_source,
-                                                            NULL,
-                                                            source_get_last_credentials_required_arguments_cb,
-                                                            self);
-        }
+        if (username && *username)
+          {
+            provider = e_source_credentials_provider_new (self->source_registry);
+            credentials = e_named_parameters_new ();
+            e_named_parameters_set (credentials, E_SOURCE_CREDENTIAL_USERNAME, username);
+            e_named_parameters_set (credentials, E_SOURCE_CREDENTIAL_PASSWORD, config->password);
 
-      g_clear_object (&cred_source);
-    }
+            if (!e_source_credentials_provider_store_sync (provider,
+                                                           caldav_source,
+                                                           credentials,
+                                                           TRUE,
+                                                           NULL,
+                                                           &config_error))
+              {
+                g_warning ("Failed to store CalDAV credentials: %s", config_error->message);
+                g_clear_error (&config_error);
+              }
+          }
+        else
+          {
+            g_warning ("CalDAV username not set; skipping credential storage");
+          }
+      }
 
-  g_list_free_full (sources, g_object_unref);
+    /* Load the source */
+    load_source (self, caldav_source);
 
-  /* The eds_credentials_prompter responses to REQUIRED and REJECTED reasons,
-     the SSL_FAILED should be handled elsewhere. */
-  g_signal_connect_object (self->source_registry, "credentials-required", G_CALLBACK (source_credentials_required_cb), self, 0);
+    g_debug ("Successfully loaded declarative CalDAV account: %s", config->display_name);
+  }
 
-  e_credentials_prompter_process_awaiting_credentials (self->credentials_prompter);
-
-  g_signal_connect_object (self->source_registry, "source-added", G_CALLBACK (load_source), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->source_registry, "source-removed", G_CALLBACK (remove_source), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->source_registry, "source-changed", G_CALLBACK (source_changed), self, G_CONNECT_SWAPPED);
-
-  sources = e_source_registry_list_enabled (self->source_registry, E_SOURCE_EXTENSION_CALENDAR);
-
-  for (l = sources; l != NULL; l = l->next)
-    load_source (self, l->data);
-
-  g_list_free (sources);
+  /* Connect signals for source changes */
+  g_signal_connect_object (self->source_registry, "source-added",
+                           G_CALLBACK (load_source), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->source_registry, "source-removed",
+                           G_CALLBACK (remove_source), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->source_registry, "source-changed",
+                           G_CALLBACK (source_changed), self, G_CONNECT_SWAPPED);
 
   GCAL_EXIT;
 }

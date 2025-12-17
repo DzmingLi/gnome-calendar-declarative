@@ -570,7 +570,6 @@ animate_row_scroll (GcalMonthView *self,
     {
       g_autoptr (AdwAnimationTarget) animation_target = NULL;
       g_autofree gdouble *last_offset_location = NULL;
-      GtkReducedMotion reduced_motion;
       gboolean increase_duration;
 
       /*
@@ -581,12 +580,15 @@ animate_row_scroll (GcalMonthView *self,
                     "gtk-enable-animations", &increase_duration,
                     NULL);
 
+#if GTK_CHECK_VERSION(4, 21, 0)
+      GtkReducedMotion reduced_motion;
       g_object_get (gtk_widget_get_settings (GTK_WIDGET (self)),
                     "gtk-interface-reduced-motion", &reduced_motion,
                     NULL);
 
       if (reduced_motion == GTK_REDUCED_MOTION_REDUCE)
         increase_duration = FALSE;
+#endif
 
       animation_target = adw_callback_animation_target_new (animate_row_scroll_cb, self, NULL);
 

@@ -160,13 +160,13 @@ assert(cc.has_function('icaltime_days_in_year', dependencies: libical_dep),
        'Error: icaltime_days_in_year() not found in libical!. Upgrade your libical library.')
 
 gsettings_desktop_schemas_dep = dependency('gsettings-desktop-schemas', version: '>= 3.21.2')
-libedataserverui_dep = dependency('libedataserverui4-1.0', version: '>= 3.45.1')
+# libedataserverui_dep removed - no longer needed without GOA
 libedataserver_dep = dependency('libedataserver-1.2', version: '>= 3.45.1')
 libecal_dep = dependency('libecal-2.0', version: '>= 3.45.1')
 libsoup_dep = dependency('libsoup-3.0')
-libadwaita_dep = dependency('libadwaita-1', version: '>= 1.8.alpha')
-glib_dep = dependency('glib-2.0', version: '>= 2.80.0')
-gtk_dep = dependency('gtk4', version: '>= 4.21.2')
+libadwaita_dep = dependency('libadwaita-1', version: '>= 1.6')
+glib_dep = dependency('glib-2.0', version: '>= 2.78.0')
+gtk_dep = dependency('gtk4', version: '>= 4.12')
 gio_dep = dependency('gio-2.0', version: '>= 2.58.0')
 gweather_dep = dependency('gweather4')
 geoclue_dep = dependency('libgeoclue-2.0', version: '>=2.4')
